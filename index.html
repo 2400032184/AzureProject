@@ -1,0 +1,61 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Azure Vending Hub</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#172033}
+header{background:#0878d1;color:white;padding:18px 32px;display:flex;justify-content:space-between;align-items:center}
+header b{font-size:22px}.badge{background:#ffffff22;padding:8px 12px;border-radius:20px}
+nav{background:white;padding:12px 32px;border-bottom:1px solid #ddd}button{border:0;border-radius:7px;padding:10px 15px;cursor:pointer;background:#0878d1;color:white;margin:3px}
+button.secondary{background:#e8eef5;color:#172033}button.green{background:#16834b}
+main{padding:25px;max-width:1200px;margin:auto}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.card{background:white;border-radius:12px;padding:18px;box-shadow:0 2px 10px #00000010}.num{font-size:30px;font-weight:bold;margin-top:8px}
+.grid{display:grid;grid-template-columns:1.3fr .7fr;gap:18px;margin-top:18px}.panel{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 10px #00000010}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px;border-bottom:1px solid #eee}th{font-size:13px;color:#667085}
+.status{padding:5px 9px;border-radius:15px;font-size:12px;background:#eef2f7}.approved{background:#e4f7eb;color:#126b3b}.pending{background:#fff4d6;color:#8a6100}.vended{background:#e1f0ff;color:#075c9e}
+input,select{width:100%;box-sizing:border-box;padding:11px;margin:6px 0 12px;border:1px solid #ccd4df;border-radius:7px}
+.hide{display:none}.steps div{padding:12px;border-left:4px solid #0878d1;background:#f7faff;margin:8px 0}
+@media(max-width:800px){.cards,.grid{grid-template-columns:1fr}.grid{display:block}}
+</style></head>
+<body>
+<header><b>☁ Azure Vending Hub</b><span class="badge">Hackathon Prototype • Governance First</span></header>
+<nav><button onclick="show('dash')">Dashboard</button><button onclick="show('request')">New Request</button><button onclick="show('workflow')">Workflow</button><button onclick="show('governance')">Governance</button></nav>
+<main>
+<section id="dash">
+<h1>Subscription Vending Dashboard</h1><p>Automated request → approval → governance → landing-zone handoff.</p>
+<div class="cards" id="cards"></div>
+<div class="grid"><div class="panel"><h2>Recent Requests</h2><div id="requests"></div></div>
+<div class="panel"><h2>Control Center</h2><p>✓ Naming validation</p><p>✓ Required tags</p><p>✓ RBAC scope</p><p>✓ Region guardrail</p><p>✓ Budget alert</p><button onclick="load()">Refresh</button></div></div>
+</section>
+<section id="request" class="hide"><div class="panel"><h1>Request a Subscription</h1>
+<label>Application Name</label><input id="app" placeholder="Travel Booking Portal">
+<label>Owner Team</label><input id="owner" placeholder="travel-team">
+<label>Environment</label><select id="env"><option>Sandbox</option><option>Development</option><option>Production</option></select>
+<label>Azure Region</label><select id="region"><option>eastus</option><option>centralindia</option><option>westus</option></select>
+<label>Cost Center</label><input id="cc" placeholder="CC1001">
+<button onclick="submitReq()">Submit Request</button><p id="msg"></p></div></section>
+<section id="workflow" class="hide"><div class="panel"><h1>Vending Workflow</h1>
+<div class="steps"><div><b>1. Request</b><br>Application owner submits business and technical details.</div>
+<div><b>2. Validate</b><br>Check naming, owner, cost center, environment and region.</div>
+<div><b>3. Approve</b><br>Authorized reviewer approves the request.</div>
+<div><b>4. Vend</b><br>Automation prepares subscription configuration and landing zone.</div>
+<div><b>5. Govern</b><br>Management group, Policy, RBAC, tags and budget are applied.</div>
+<div><b>6. Handoff</b><br>Application team receives controlled access.</div></div></div></section>
+<section id="governance" class="hide"><div class="panel"><h1>Governance Center</h1>
+<table><tr><th>CONTROL</th><th>RULE</th><th>DEMO RESULT</th></tr>
+<tr><td>Azure Policy</td><td>Allowed regions + required tags</td><td>Compliant</td></tr>
+<tr><td>RBAC</td><td>Application team gets Contributor at workload scope</td><td>Compliant</td></tr>
+<tr><td>Tags</td><td>Environment, Owner, CostCenter, Project</td><td>Compliant</td></tr>
+<tr><td>Budget</td><td>Monthly budget and alert</td><td>Configured</td></tr>
+<tr><td>Management Group</td><td>Landing-Zones/{Environment}</td><td>Configured</td></tr>
+</table></div></section>
+</main>
+<script>
+const API='http://localhost:8080/api';
+function show(id){['dash','request','workflow','governance'].forEach(x=>document.getElementById(x).classList.toggle('hide',x!==id)); if(id==='dash')load();}
+async function load(){try{let d=await (await fetch(API+'/dashboard')).json();cards.innerHTML=
+['totalRequests','pending','approved','vended'].map((k,i)=>`<div class="card"><small>${['TOTAL REQUESTS','PENDING','APPROVED','VENDED'][i]}</small><div class="num">${d[k]}</div></div>`).join('');
+let r=await (await fetch(API+'/requests')).json();requests.innerHTML='<table><tr><th>APP</th><th>ENV</th><th>REGION</th><th>STATUS</th><th>ACTION</th></tr>'+
+r.map(x=>`<tr><td>${x.application}</td><td>${x.environment}</td><td>${x.region}</td><td><span class="status ${x.status.toLowerCase()}">${x.status}</span></td><td>${x.status==='Pending'?`<button onclick="act('${x.id}','approve')">Approve</button>`:''}${x.status==='Approved'?`<button class="green" onclick="act('${x.id}','vend')">Vend</button>`:''}</td></tr>`).join('')+'</table>';}catch(e){document.getElementById('requests').innerHTML='<p>Backend not running. Start Spring Boot on port 8080.</p>';}}
+async function act(id,a){await fetch(API+`/requests/${id}/${a}`,{method:'POST'});load();}
+async function submitReq(){let body={application:app.value,owner:owner.value,environment:env.value,region:region.value,costCenter:cc.value};let r=await fetch(API+'/requests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});msg.textContent='Request submitted successfully. Open Dashboard for approval.';app.value='';owner.value='';cc.value='';}
+load();
+</script></body></html>
